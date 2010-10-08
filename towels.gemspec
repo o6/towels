@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
 	spec.name        = "towels"
-	spec.version     = 0.1.1
+	spec.version     = 0.11
 	spec.platform    = Gem::Platform::RUBY
 	spec.authors     = ["Carter Allen, Opt-6 Products, LLC"]
 	spec.email       = ["CarterA@opt-6.com"]
