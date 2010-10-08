@@ -1,0 +1,99 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require "rubikon"
+require "pathname"
+
+$TOWELS_CONFIG_FILES = ["Towels.yml", "towels.yml", "config/towels.yml"]
+
+class TowelCLI < Rubikon::Application::Base
+	
+	def initialize
+		
+		super
+		
+		# Load Settings
+		set :config, YAML::load(File.open(Dir.glob($TOWELS_CONFIG_FILES).first))
+		set :help_banner, "\n\e[1mTowel - Whimsical dependency management for unpackaged projectse\e[0m\n\nUsage:"
+		
+		# Load Towels
+		towel_directories = ["Towels"] unless @settings[:config]["towel_directories"]
+		towel_directories.each_index { |index| towel_directories[index] = (towel_directories[index] + "/**/*.yml") }
+		towels = []
+		Dir.glob(towel_directories).each do |file|
+			towels << YAML::load(File.open(file))
+		end
+		set :towels, towels
+	
+	
+	end
+	
+	default do
+		@commands[:link].run
+	end
+	
+	command :update, "Download/update all included towels" do
+		@settings[:towels].each do |towel|
+			
+			# Git download type
+			if (towel["download"]["type"] === "git")
+				if File.exists?("Sources/#{towel["name"]}")
+					print_header "Updating #{towel["name"]}"
+					throbber do
+						%x[git --git-dir=Sources/#{towel["name"]}/.git --work-tree=../ pull #{"-q " if !$VERBOSE} origin master]
+					end
+					print "\n"
+				else
+					print_header "Cloning #{towel["name"]}"
+					throbber do
+						%x[git clone #{towel["download"]["url"]} Sources/#{towel["name"]}]
+					end
+					print "\n"
+				end
+			end
+			
+		end
+	end
+	
+	command :compile, "Update then compile all included towels" do
+		@commands[:update].run
+		@settings[:towels].each do |towel|
+			
+			# Custom compile type
+			if (towel["compile"]["type"] === "custom" || !towel["compile"]["type"])
+				print_header "Compiling #{towel["name"]}"
+				throbber do
+					%x[cd Sources/#{towel["name"]}; #{towel["compile"]["command"]} #{towel["compile"]["flags"]}]
+					print "\n"
+				end
+			end
+			
+		end
+	end
+	
+	command :link, "Update, compile, then link all included towels." do
+		@commands[:compile].run
+		@settings[:towels].each do |towel|
+			print_header "Linking #{towel["name"]}"
+			towel["link"].each do |link_step|
+				
+				link_step = towel["link"][link_step.first]
+				if (link_step["type"] === "soft_link")
+					dest_path = Pathname.new(File.expand_path(link_step["destination"]))
+					FileUtils.mkdir_p(dest_path.parent.to_s)
+					if (!File.exist?(dest_path.to_s))
+						FileUtils.ln_sf(File.expand_path("Sources/#{towel["name"]}/#{link_step["source"]}"), dest_path.to_s)
+					end
+				else (link_step["type"] === "include")
+					puts "include"
+				end
+				
+			end
+		end
+	end
+	
+	def print_header message
+		print "\e[1;36m==> " + message + "\e[0m\n"
+	end
+	
+end
