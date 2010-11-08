@@ -35,7 +35,6 @@ class TowelCLI < Rubikon::Application::Base
 	command :update, "Download/update all included towels" do
 		@settings[:towels].each do |towel|
 			
-			# Git download type
 			if (towel["download"]["type"] === "git")
 				if File.exists?("Sources/#{towel["name"]}")
 					print_header "Updating #{towel["name"]}"
@@ -50,8 +49,21 @@ class TowelCLI < Rubikon::Application::Base
 					end
 					print "\n"
 				end
+			else (towel["download"]["type"] === "hg")
+				if File.exists?("Sources/#{towel["name"]}")
+					print_header "Updating #{towel["name"]}"
+					throbber do
+						%x[hg #{"-q " if !$VERBOSE} --repository Sources/#{towel["name"]} pull]
+					end
+					print "\n"
+				else
+					print_header "Cloning #{towel["name"]}"
+					throbber do
+						%x[hg clone #{towel["download"]["url"]} Sources/#{towel["name"]}]
+					end
+					print "\n"
+				end
 			end
-			
 		end
 	end
 	
